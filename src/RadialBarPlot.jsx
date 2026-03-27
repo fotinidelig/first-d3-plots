@@ -1,6 +1,46 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as d3 from "d3";
 import studentData from "./student_data";
+
+const COUNTRY_TO_ISO2 = {
+  "United States": "US",
+  France: "FR",
+  "United Kingdom": "GB",
+  Germany: "DE",
+  Switzerland: "CH",
+  Spain: "ES",
+  Netherlands: "NL",
+  India: "IN",
+  Singapore: "SG",
+  Ireland: "IE",
+  Sweden: "SE",
+  Australia: "AU",
+  Canada: "CA",
+  Finland: "FI",
+  Mexico: "MX",
+  Brazil: "BR",
+  "Saudi Arabia": "SA",
+  Romania: "RO",
+  Philippines: "PH",
+  "New Zealand": "NZ",
+};
+
+function iso2ToFlag(iso2) {
+  if (!iso2 || typeof iso2 !== "string" || iso2.length !== 2) return "";
+  const codePoints = iso2
+    .toUpperCase()
+    .split("")
+    .map((char) => 127397 + char.charCodeAt(0));
+  return String.fromCodePoint(...codePoints);
+}
+
+function clamp01(x) {
+  return Math.max(0, Math.min(1, x));
+}
+
+function easeOutCubic(t) {
+  return 1 - Math.pow(1 - t, 3);
+}
 
 function polarToCartesian(r, angleRad) {
   // Rotate so 0 rad is at 12 o'clock.
@@ -31,6 +71,7 @@ function toSafeId(str) {
 
 function RadialBarPlot() {
   const [hoveredCountry, setHoveredCountry] = useState(null);
+  const [animT, setAnimT] = useState(0);
 
   const data = useMemo(() => {
     return [...studentData].sort((a, b) => b.students - a.students);
@@ -66,6 +107,30 @@ function RadialBarPlot() {
 
   const totalStudents = useMemo(() => d3.sum(data, (d) => d.students), [data]);
 
+  useEffect(() => {
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduceMotion) {
+      setAnimT(1);
+      return;
+    }
+
+    let raf = 0;
+    const durationMs = 1100;
+    const start = performance.now();
+
+    const tick = (now) => {
+      const t = clamp01((now - start) / durationMs);
+      setAnimT(t);
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
   return (
     <svg width={width} height={height} role="img" aria-label="Students by country radial bar chart">
       <defs>
@@ -99,7 +164,7 @@ function RadialBarPlot() {
 
       <g transform={`translate(${cx}, ${cy})`}>
         {/* Bars */}
-        {data.map((d) => {
+        {data.map((d, i) => {
           const startAngle = angleScale(d.country);
           if (startAngle === undefined) return null;
 
@@ -108,9 +173,17 @@ function RadialBarPlot() {
           const isHovered = hoveredCountry === d.country;
           const gradId = `radial-grad-${toSafeId(d.country)}`;
 
+          // Animation: appear from 12 o'clock clockwise (i increases clockwise),
+          // while each bar grows from the inner radius to its final length.
+          const n = data.length || 1;
+          const sweep = animT * (n + 1); // +1 gives a tiny tail so last bar finishes cleanly
+          const local = clamp01(sweep - i);
+          const grown = easeOutCubic(local);
+          const outerRAnimated = innerRadius + (outerR - innerRadius) * grown;
+
           const dPath = arcPath({
             innerR: innerRadius,
-            outerR,
+            outerR: outerRAnimated,
             startAngle,
             endAngle,
           });
@@ -120,6 +193,7 @@ function RadialBarPlot() {
               key={d.country}
               d={dPath}
               fill={isHovered ? "#35543b" : `url(#${gradId})`}
+              opacity={local === 0 ? 0 : 1}
               onMouseEnter={() => setHoveredCountry(d.country)}
               onMouseLeave={() => setHoveredCountry(null)}
               style={{ cursor: "pointer" }}
@@ -133,7 +207,9 @@ function RadialBarPlot() {
         {/* Center value */}
         <text style={{ textAnchor: "middle", fill: "#111827" }}>
           <tspan x={0} y={-6} fontSize={13} fontWeight={700}>
-            {active ? active.country : "Total"}
+            {active
+              ? `${active.country} ${iso2ToFlag(COUNTRY_TO_ISO2[active.country])}`.trim()
+              : "Total"}
           </tspan>
           <tspan x={0} y={25} fontSize={34} fontWeight={900}>
             {active ? active.students : totalStudents}
@@ -160,6 +236,12 @@ function RadialBarPlot() {
           const norm = ((radialDeg % 360) + 360) % 360; // [0, 360)
           const shouldFlip = norm > 90 && norm < 270;
           const rot = shouldFlip ? radialDeg + 180 : radialDeg;
+          const countryLabel = d.country === "United States" ? "USA" : d.country;
+          const flag = iso2ToFlag(COUNTRY_TO_ISO2[d.country]);
+          // Ensure the flag is always closest to the bar tip:
+          // - textAnchor="start" (right side): text extends outward → put flag first
+          // - textAnchor="end" (left side): text ends at the tip → put flag last
+          const labelText = shouldFlip ? `${countryLabel} ${flag}`.trim() : `${flag} ${countryLabel}`.trim();
 
           return (
             <text
@@ -170,7 +252,7 @@ function RadialBarPlot() {
               dominantBaseline="middle"
               transform={`translate(${x}, ${y}) rotate(${rot})`}
             >
-              {d.country === "United States" ? "USA" : d.country}
+              {labelText}
             </text>
           );
         })}
