@@ -7,7 +7,9 @@
 body {
   margin: 0;
   /* use Datatype google font for main text */
-  font-family: 'Datatype', sans-serif;
+  font-family: 'Datatype';
+  font-weight: 400;
+  font-style: normal;
 }
 
 #root {

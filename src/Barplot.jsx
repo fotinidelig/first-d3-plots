@@ -2,6 +2,38 @@ import { useMemo, useState } from "react";
 import * as d3 from "d3";
 import studentData from "./student_data";
 
+const COUNTRY_TO_ISO2 = {
+  "United States": "US",
+  France: "FR",
+  "United Kingdom": "GB",
+  Germany: "DE",
+  Switzerland: "CH",
+  Spain: "ES",
+  Netherlands: "NL",
+  India: "IN",
+  Singapore: "SG",
+  Ireland: "IE",
+  Sweden: "SE",
+  Australia: "AU",
+  Canada: "CA",
+  Finland: "FI",
+  Mexico: "MX",
+  Brazil: "BR",
+  "Saudi Arabia": "SA",
+  Romania: "RO",
+  Philippines: "PH",
+  "New Zealand": "NZ",
+};
+
+function iso2ToFlag(iso2) {
+  if (!iso2 || typeof iso2 !== "string" || iso2.length !== 2) return "";
+  const codePoints = iso2
+    .toUpperCase()
+    .split("")
+    .map((char) => 127397 + char.charCodeAt(0));
+  return String.fromCodePoint(...codePoints);
+}
+
 function Barplot() {
   const [hoveredCountry, setHoveredCountry] = useState(null);
 
@@ -68,6 +100,7 @@ function Barplot() {
           const barCenterY = y + barHeight / 2;
           const isHovered = hoveredCountry === d.country;
           const labelFontSize = isHovered ? 14 : 12;
+          const flag = iso2ToFlag(COUNTRY_TO_ISO2[d.country]);
 
           return (
             <g
@@ -84,7 +117,7 @@ function Barplot() {
                 fill="#111827"
                 fontSize={labelFontSize}
               >
-                {d.country}
+                {d.country} {flag}
               </text>
 
               <rect
