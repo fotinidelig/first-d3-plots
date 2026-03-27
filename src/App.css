@@ -34,8 +34,50 @@
   color:rgb(168, 1, 26);
 }
 
-.barplot {
+.chartArea {
+  width: min(900px, 80%);
+}
+
+.chartAreaTabs {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-end;
+  padding: 0 0.5rem;
+}
+
+.chartAreaTab {
+  appearance: none;
+  border: 0;
+  background-color: #99ad9d;
+  color: #111;
+  font-family: inherit;
+  font-size: 14px;
+  padding: 0.65rem 0.9rem;
+  border-radius: 10px 10px 0 0;
+  cursor: pointer;
+  transform: translateY(1px);
+}
+
+.chartAreaTab.is-active {
   background-color: #c9dcce;
-  border-radius: 8px;
-  /* padding: 0.1rem; */
+  transform: translateY(0);
+}
+
+.chartAreaPanel {
+  background-color: #c9dcce;
+  border-radius: 10px;
+  padding: 0.75rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.chartAreaTabs + .chartAreaPanel {
+  border-top-left-radius: 6px;
+}
+
+.chartAreaPanel > svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
 }
