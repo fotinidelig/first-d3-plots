@@ -1,0 +1,15 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  /* use Datatype google font for main text */
+  font-family: 'Datatype', sans-serif;
+}
+
+#root {
+  min-height: 100dvh;
+}
