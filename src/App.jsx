@@ -2,7 +2,7 @@ import './App.css'
 import ResponsiveBarplot from "./Barplot";
 import ChartArea from "./ChartArea";
 import ResponsiveIconBarPlot from "./IconBarPlot";
-import RadialBarPlot from "./RadialBarPlot";
+import ResponsiveRadialBarPlot from "./RadialBarPlot";
 
 function App() {
 
@@ -24,7 +24,7 @@ function App() {
           {
             id: "radial",
             label: "RadialBarPlot",
-            node: <RadialBarPlot />,
+            node: <ResponsiveRadialBarPlot />,
           },
         ]}
         initialChartId="bars"

@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as d3 from "d3";
 import studentData from "./student_data";
+import { useDimensions } from "./use-dimensions";
 
 const COUNTRY_TO_ISO2 = {
   "United States": "US",
@@ -46,35 +47,42 @@ function toSafeId(str) {
   return String(str).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }
 
-function RadialBarPlot() {
+export function RadialBarPlot({ width, height, data }) {
   const [hoveredCountry, setHoveredCountry] = useState(null);
   const [animT, setAnimT] = useState(0);
 
-  const data = useMemo(() => {
-    return [...studentData].sort((a, b) => b.students - a.students);
-  }, []);
+  const safeData = useMemo(() => data ?? [], [data]);
 
-  const width = 650;
-  const height = 650;
+  const sortedData = useMemo(() => {
+    return [...safeData].sort((a, b) => (b.students ?? 0) - (a.students ?? 0));
+  }, [safeData]);
+
+  const w = width ?? 0;
+  const h = height ?? 0;
+
   const margin = 50;
 
-  const cx = width / 2;
-  const cy = height / 2;
-  const outerRadius = Math.min(width, height) / 2 - margin;
-  const innerRadius = Math.round(outerRadius * 0.35);
+  const cx = w / 2;
+  const cy = h / 2;
+  const outerRadius = Math.min(w, h) / 2 - margin;
+  const innerRadius = Math.round(Math.max(0, outerRadius) * 0.35);
 
-  const maxValue = useMemo(() => d3.max(data, (d) => d.students) ?? 0, [data]);
+  const maxValue = useMemo(
+    () => d3.max(sortedData, (d) => d.students) ?? 0,
+    [sortedData],
+  );
 
   const angleScale = useMemo(() => {
     return d3
       .scaleBand()
-      .domain(data.map((d) => d.country))
+      .domain(sortedData.map((d) => d.country))
       .range([0, Math.PI * 2])
       .padding(0.08);
-  }, [data]);
+  }, [sortedData]);
 
   const radiusScale = useMemo(() => {
-    return d3.scaleLinear().domain([0, maxValue]).range([innerRadius, outerRadius]).nice();
+    const safeOuter = Math.max(innerRadius, outerRadius);
+    return d3.scaleLinear().domain([0, maxValue]).range([innerRadius, safeOuter]).nice();
   }, [innerRadius, outerRadius, maxValue]);
 
   const arcGen = useMemo(() => {
@@ -87,10 +95,13 @@ function RadialBarPlot() {
   }, []);
 
   const active = hoveredCountry
-    ? data.find((d) => d.country === hoveredCountry) ?? null
+    ? sortedData.find((d) => d.country === hoveredCountry) ?? null
     : null;
 
-  const totalStudents = useMemo(() => d3.sum(data, (d) => d.students), [data]);
+  const totalStudents = useMemo(
+    () => d3.sum(sortedData, (d) => d.students),
+    [sortedData],
+  );
 
   useEffect(() => {
     const reduceMotion =
@@ -116,10 +127,13 @@ function RadialBarPlot() {
     return () => cancelAnimationFrame(raf);
   }, []);
 
+  // Keep hook order stable: bail out only after hooks run.
+  if (w <= 0 || h <= 0 || outerRadius <= 0) return null;
+
   return (
     <svg width={width} height={height} role="img" aria-label="Students by country radial bar chart">
       <defs>
-        {data.map((d) => {
+        {sortedData.map((d) => {
           const startAngle = angleScale(d.country);
           if (startAngle === undefined) return null;
           const midAngle = startAngle + angleScale.bandwidth() / 2;
@@ -149,7 +163,7 @@ function RadialBarPlot() {
 
       <g transform={`translate(${cx}, ${cy})`}>
         {/* Bars */}
-        {data.map((d, i) => {
+        {sortedData.map((d, i) => {
           const startAngle = angleScale(d.country);
           if (startAngle === undefined) return null;
 
@@ -158,7 +172,7 @@ function RadialBarPlot() {
           const isHovered = hoveredCountry === d.country;
           const gradId = `radial-grad-${toSafeId(d.country)}`;
 
-          const n = data.length || 1;
+          const n = sortedData.length || 1;
           const sweep = animT * (n + 1); // +1 gives a tiny tail so last bar finishes cleanly
           const local = clamp01(sweep - i);
           const grown = easeOutCubic(local);
@@ -204,7 +218,7 @@ function RadialBarPlot() {
         </text>
 
         {/* Labels */}
-        {data.map((d) => {
+        {sortedData.map((d) => {
           const startAngle = angleScale(d.country);
           if (startAngle === undefined) return null;
           const midAngle = startAngle + angleScale.bandwidth() / 2;
@@ -239,5 +253,31 @@ function RadialBarPlot() {
   );
 }
 
-export default RadialBarPlot;
+export function ResponsiveRadialBarPlot({ data = studentData, maxSize = 650 }) {
+  const chartRef = useRef(null);
+  const chartSize = useDimensions(chartRef);
+
+  const safeMaxSize = Number.isFinite(maxSize) ? maxSize : 650;
+  const size = Math.max(0, Math.min(chartSize.width, safeMaxSize));
+
+  const sortedData = useMemo(() => {
+    return [...(data ?? [])].sort((a, b) => (b.students ?? 0) - (a.students ?? 0));
+  }, [data]);
+
+  return (
+    <div
+      ref={chartRef}
+      style={{
+        width: "100%",
+        maxWidth: safeMaxSize,
+        margin: "0 auto",
+        aspectRatio: "1 / 1",
+      }}
+    >
+      <RadialBarPlot width={size} height={size} data={sortedData} />
+    </div>
+  );
+}
+
+export default ResponsiveRadialBarPlot;
 
