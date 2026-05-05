@@ -1,7 +1,7 @@
 import './App.css'
 import ResponsiveBarplot from "./Barplot";
 import ChartArea from "./ChartArea";
-import IconBarPlot from "./IconBarPlot";
+import ResponsiveIconBarPlot from "./IconBarPlot";
 import RadialBarPlot from "./RadialBarPlot";
 
 function App() {
@@ -19,7 +19,7 @@ function App() {
           {
             id: "alt",
             label: "IconBarPlot",
-            node: <IconBarPlot />,
+            node: <ResponsiveIconBarPlot />,
           },
           {
             id: "radial",

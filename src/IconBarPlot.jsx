@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import * as d3 from "d3";
 import studentData from "./student_data";
+import { useDimensions } from "./use-dimensions";
 
 const COUNTRY_TO_ISO2 = {
   "United States": "US",
@@ -34,34 +35,49 @@ function iso2ToFlag(iso2) {
   return String.fromCodePoint(...codePoints);
 }
 
-function IconBarPlot() {
+export function IconBarPlot({ width, height, data }) {
   const [hoveredCountry, setHoveredCountry] = useState(null);
 
-  // 1) Sort once so bars render from highest to lowest (top to bottom).
-  const data = useMemo(() => {
-    return [...studentData].sort((a, b) => b.students - a.students);
-  }, []);
+  const safeData = useMemo(() => data ?? [], [data]);
+
+  // Sort once so bars render from highest to lowest (top to bottom).
+  const sortedData = useMemo(() => {
+    return [...safeData].sort((a, b) => (b.students ?? 0) - (a.students ?? 0));
+  }, [safeData]);
 
   // 2) Chart dimensions and margins.
-  const width = 800;
-  const rowHeight = 24;
   const margin = { top: 20, right: 70, bottom: 34, left: 180 };
-  const height = margin.top + margin.bottom + data.length * rowHeight;
-
-  const innerHeight = height - margin.top - margin.bottom;
+  const innerWidth = Math.max(0, (width ?? 0) - margin.left - margin.right);
+  const innerHeight = Math.max(0, (height ?? 0) - margin.top - margin.bottom);
 
   const yScale = useMemo(() => {
     return d3
       .scaleBand()
-      .domain(data.map((d) => d.country))
+      .domain(sortedData.map((d) => d.country))
       .range([0, innerHeight])
       .padding(0.2);
-  }, [data, innerHeight]);
+  }, [sortedData, innerHeight]);
 
   // Icon layout: one book per student.
   const iconSize = 6.5;
   const iconGap = 2;
   const iconStep = iconSize + iconGap;
+
+  if (!width || !height) return null;
+
+  // If the full icon count can't fit, scale *all* bars proportionally.
+  const maxStudents = useMemo(
+    () => d3.max(sortedData, (d) => d.students) ?? 0,
+    [sortedData],
+  );
+  const valueLabelPad = 44; // reserved space for the numeric label
+  const maxIconsThatFit = Math.max(0, Math.floor((innerWidth - valueLabelPad) / iconStep));
+  const iconsPerStudent = maxStudents > 0 ? Math.min(1, maxIconsThatFit / maxStudents) : 1;
+  const scaledIcons = (students) => {
+    if (!students || students <= 0) return 0;
+    if (maxIconsThatFit <= 0) return 0;
+    return Math.max(1, Math.round(students * iconsPerStudent));
+  };
 
   return (
     <svg width={width} height={height} role="img" aria-label="Students by country bar chart">
@@ -100,7 +116,7 @@ function IconBarPlot() {
       <g transform={`translate(${margin.left}, ${margin.top})`}>
 
         {/* icon bars + y labels + value labels */}
-        {data.map((d, i) => {
+        {sortedData.map((d, i) => {
           const y = yScale(d.country);
           if (y === undefined) return null;
           const barHeight = yScale.bandwidth();
@@ -110,7 +126,7 @@ function IconBarPlot() {
           const iconSizeToUse = isHovered ? 7 : 6.5;
           const flag = iso2ToFlag(COUNTRY_TO_ISO2[d.country]);
 
-          const iconsCount = d.students;
+          const iconsCount = scaledIcons(d.students);
 
           return (
             <g
@@ -150,7 +166,7 @@ function IconBarPlot() {
               })}
 
               <text
-                x={iconsCount * iconStep + 6}
+                x={Math.min(iconsCount * iconStep + 6, innerWidth + 6)}
                 y={barCenterY}
                 textAnchor="start"
                 dominantBaseline="middle"
@@ -168,4 +184,24 @@ function IconBarPlot() {
   );
 }
 
-export default IconBarPlot;
+export function ResponsiveIconBarPlot({ data = studentData }) {
+  const chartRef = useRef(null);
+  const chartSize = useDimensions(chartRef);
+
+  const rowHeight = 24;
+  const margin = { top: 20, right: 70, bottom: 34, left: 180 };
+
+  const sortedData = useMemo(() => {
+    return [...(data ?? [])].sort((a, b) => (b.students ?? 0) - (a.students ?? 0));
+  }, [data]);
+
+  const height = margin.top + margin.bottom + sortedData.length * rowHeight;
+
+  return (
+    <div ref={chartRef} style={{ width: "100%", height }}>
+      <IconBarPlot width={chartSize.width} height={chartSize.height} data={sortedData} />
+    </div>
+  );
+}
+
+export default ResponsiveIconBarPlot;
