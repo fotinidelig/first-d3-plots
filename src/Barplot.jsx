@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import * as d3 from "d3";
 import studentData from "./student_data";
+import { useDimensions } from "./use-dimensions";
 
 const COUNTRY_TO_ISO2 = {
   "United States": "US",
@@ -34,24 +35,25 @@ function iso2ToFlag(iso2) {
   return String.fromCodePoint(...codePoints);
 }
 
-function Barplot() {
+export function Barplot({ width, height, data }) {
   const [hoveredCountry, setHoveredCountry] = useState(null);
 
-  // 1) Sort once so bars render from highest to lowest (top to bottom).
-  const data = useMemo(() => {
-    return [...studentData].sort((a, b) => b.students - a.students);
-  }, []);
+  const safeData = useMemo(() => data ?? [], [data]);
+
+  // Sort once so bars render from highest to lowest (top to bottom).
+  const sortedData = useMemo(() => {
+    return [...safeData].sort((a, b) => (b.students ?? 0) - (a.students ?? 0));
+  }, [safeData]);
 
   // 2) Chart dimensions and margins.
-  const width = 650;
-  const rowHeight = 24;
   const margin = { top: 20, right: 70, bottom: 34, left: 180 };
-  const height = margin.top + margin.bottom + data.length * rowHeight;
+  const innerWidth = Math.max(0, (width ?? 0) - margin.left - margin.right);
+  const innerHeight = Math.max(0, (height ?? 0) - margin.top - margin.bottom);
 
-  const innerWidth = width - margin.left - margin.right;
-  const innerHeight = height - margin.top - margin.bottom;
-
-  const xMax = useMemo(() => d3.max(data, (d) => d.students) ?? 0, [data]);
+  const xMax = useMemo(
+    () => d3.max(sortedData, (d) => d.students) ?? 0,
+    [sortedData],
+  );
 
   const xScale = useMemo(() => {
     return d3.scaleLinear().domain([0, xMax]).range([0, innerWidth]).nice();
@@ -60,10 +62,12 @@ function Barplot() {
   const yScale = useMemo(() => {
     return d3
       .scaleBand()
-      .domain(data.map((d) => d.country))
+      .domain(sortedData.map((d) => d.country))
       .range([0, innerHeight])
       .padding(0.2);
-  }, [data, innerHeight]);
+  }, [sortedData, innerHeight]);
+
+  if (!width || !height) return null;
 
   return (
     <svg width={width} height={height} role="img" aria-label="Students by country bar chart">
@@ -92,7 +96,7 @@ function Barplot() {
       <g transform={`translate(${margin.left}, ${margin.top})`}>
 
         {/* bars + y labels + value labels */}
-        {data.map((d, i) => {
+        {sortedData.map((d, i) => {
           const y = yScale(d.country);
           if (y === undefined) return null;
           const barWidth = xScale(d.students);
@@ -150,4 +154,24 @@ function Barplot() {
   );
 }
 
-export default Barplot;
+export function ResponsiveBarplot({ data = studentData }) {
+  const chartRef = useRef(null);
+  const chartSize = useDimensions(chartRef);
+
+  const rowHeight = 24;
+  const margin = { top: 20, right: 70, bottom: 34, left: 180 };
+
+  const sortedData = useMemo(() => {
+    return [...(data ?? [])].sort((a, b) => (b.students ?? 0) - (a.students ?? 0));
+  }, [data]);
+
+  const height = margin.top + margin.bottom + sortedData.length * rowHeight;
+
+  return (
+    <div ref={chartRef} style={{ width: "100%", height }}>
+      <Barplot width={chartSize.width} height={chartSize.height} data={sortedData} />
+    </div>
+  );
+}
+
+export default ResponsiveBarplot;

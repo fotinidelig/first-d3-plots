@@ -1,5 +1,5 @@
 import './App.css'
-import Barplot from "./Barplot";
+import ResponsiveBarplot from "./Barplot";
 import ChartArea from "./ChartArea";
 import IconBarPlot from "./IconBarPlot";
 import RadialBarPlot from "./RadialBarPlot";
@@ -15,7 +15,7 @@ function App() {
       </div>
       <ChartArea
         charts={[
-          { id: "bars", label: "BarPlot", node: <Barplot /> },
+          { id: "bars", label: "BarPlot", node: <ResponsiveBarplot /> },
           {
             id: "alt",
             label: "IconBarPlot",
